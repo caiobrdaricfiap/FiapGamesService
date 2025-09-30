@@ -1,18 +1,14 @@
-﻿using FIAP.Games.Domain.Entities;
+﻿using FiapGamesService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace FIAP.Games.Infrastructure
+namespace FiapGamesService.Infrastructure
 {
     public class AppDbContext : DbContext
     {
         public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-        public DbSet<Game> Games { get; set; }
+        public DbSet<GameCreatedEvent> GameCreatedEvent { get; set; }
+        public DbSet<GameChangedEvent> GameChangedEvent { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -1,17 +1,12 @@
-﻿using FIAP.Games.Domain.Entities;
+﻿using FiapGamesService.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace FIAP.Games.Infrastructure.Configuration
+namespace FiapGamesService.Infrastructure.Configuration
 {
-    public class GameConfiguration : IEntityTypeConfiguration<Game>
+    public class GameCreatedEventConfiguration : IEntityTypeConfiguration<GameCreatedEvent>
     {
-        public void Configure(EntityTypeBuilder<Game> builder)
+        public void Configure(EntityTypeBuilder<GameCreatedEvent> builder)
         {
             builder
                 .HasKey(u => u.Id);
@@ -33,7 +28,7 @@ namespace FIAP.Games.Infrastructure.Configuration
 
             builder.Property(x => x.CreatedAt)
                 .HasColumnType("datetime2")
-                .HasDefaultValueSql("SYSUTCDATETIME()");
+                .IsRequired();
 
             builder.HasIndex(x => x.Genre);
         }

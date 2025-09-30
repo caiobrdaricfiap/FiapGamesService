@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FIAP.Games.Domain.Models
+namespace FiapGamesService.Domain.Models
 {
     public class PaginationResult<T>
     {

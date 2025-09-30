@@ -1,28 +1,22 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace FIAP.Games.Domain.Entities
+﻿namespace FiapGamesService.Domain.Entities
 {
-    public class Game : BaseEntity
+    public class GameCreatedEvent : BaseEntity
     {
-        public string Name { get; private set; } = default!;
-        public string? Description { get; private set; }
-        public decimal Price { get; private set; }
-        public string Genre { get; private set; } = default!;
-        public DateTime CreatedAt { get; private set; } = DateTime.UtcNow;
+        public string Name { get; set; }
+        public string? Description { get; set; }
+        public decimal Price { get; set; }
+        public string Genre { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        private Game() { }
+        private GameCreatedEvent() { }
 
-        private Game(string name, string? description, decimal price, string genre)
+        private GameCreatedEvent(string name, string? description, decimal price, string genre)
         {
             Update(name, description, price, genre);
             CreatedAt = DateTime.UtcNow;
         }
 
-        public static Game Create(string name, string? description, decimal price, string genre)
+        public static GameCreatedEvent Create(string name, string? description, decimal price, string genre)
             => new(name, description, price, genre);
 
         public void Update(string name, string? description, decimal price, string genre)

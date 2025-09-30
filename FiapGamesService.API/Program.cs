@@ -1,4 +1,4 @@
-using FIAP.Games.Infrastructure;
+using FiapGamesService.Infrastructure;
 using FiapGamesService.API.IoC;
 using Microsoft.EntityFrameworkCore;
 

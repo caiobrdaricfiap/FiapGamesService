@@ -1,10 +1,9 @@
-﻿using FIAP.Games.Application.DTOs;
-using FIAP.Games.Application.Services;
-using FIAP.Games.Domain.Interfaces;
-using FIAP.Games.Domain.Models;
+﻿using FiapGamesService.Application.DTOs;
+using FiapGamesService.Application.Services;
+using FiapGamesService.Domain.Models;
 using Microsoft.AspNetCore.Mvc;
 
-namespace FIAP.Games.API.Controllers
+namespace FiapGamesService.Controllers
 {
     [ApiController]
     [Route("fiap/[controller]")]
@@ -19,15 +18,11 @@ namespace FIAP.Games.API.Controllers
 
         // GET /fiap/games?search=&genre=&page=1&pageSize=20
         [HttpGet]
-        public async Task<ActionResult<PaginationResult<GameDto>>> List(
-            [FromQuery] string? search,
-            [FromQuery] string? genre,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20,
-            CancellationToken ct = default)
+        [ProducesResponseType(typeof(PaginationResult<GameDto>), 200)]
+        public async Task<ActionResult<PaginationResult<GameDto>>> List([FromQuery] string? search, [FromQuery] string? genre, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
         {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 20;
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
 
             var result = await _service.ListAsync(search, genre, page, pageSize, ct);
             return Ok(result);
@@ -37,7 +32,7 @@ namespace FIAP.Games.API.Controllers
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<GameDto>> GetById(Guid id, CancellationToken ct = default)
         {
-            var dto = await _service.GetAsync(id, ct);
+            var dto = await _service.GetByIdAsync(id, ct);   // <- nome correto
             return dto is null ? NotFound() : Ok(dto);
         }
 
@@ -45,7 +40,7 @@ namespace FIAP.Games.API.Controllers
         [HttpPost]
         public async Task<ActionResult> Create([FromBody] GameCreateDto dto, CancellationToken ct = default)
         {
-            if (dto is null) return BadRequest();
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
             var id = await _service.CreateAsync(dto, ct);
             return CreatedAtAction(nameof(GetById), new { id }, new { id });
         }
@@ -54,9 +49,16 @@ namespace FIAP.Games.API.Controllers
         [HttpPut("{id:guid}")]
         public async Task<IActionResult> Update(Guid id, [FromBody] GameUpdateDto dto, CancellationToken ct = default)
         {
-            if (dto is null) return BadRequest();
-            await _service.UpdateAsync(id, dto, ct);
-            return NoContent();
+            if (!ModelState.IsValid) return ValidationProblem(ModelState);
+            try
+            {
+                await _service.UpdateAsync(id, dto, ct);
+                return NoContent();
+            }
+            catch (KeyNotFoundException)
+            {
+                return NotFound();
+            }
         }
 
         // DELETE /fiap/games/{id}

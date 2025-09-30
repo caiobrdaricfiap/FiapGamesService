@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FIAP.Games.Application.DTOs
+namespace FiapGamesService.Application.DTOs
 {
     public class GameCreateDto
     {
