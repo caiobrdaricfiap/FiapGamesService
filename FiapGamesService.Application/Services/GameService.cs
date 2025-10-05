@@ -5,6 +5,7 @@ using FiapGamesService.Domain.Entities;
 using FiapGamesService.Domain.Enums;
 using FiapGamesService.Domain.Interfaces;
 using FiapGamesService.Domain.Models;
+using FiapGamesService.Infrastructure.Search;
 
 namespace FiapGamesService.Application.Services
 {
@@ -13,12 +14,21 @@ namespace FiapGamesService.Application.Services
         private readonly IGameCreatedEventRepository _createdRepo;
         private readonly IGameChangedEventRepository _changedRepo;
         private readonly IMapper _mapper;
+        private readonly IElasticClient _es;
+        private readonly IElasticSettings _esSettings;
 
-        public GameService(IGameCreatedEventRepository createdRepo, IGameChangedEventRepository changedRepo, IMapper mapper)
+        public GameService(
+            IGameCreatedEventRepository createdRepo,
+            IGameChangedEventRepository changedRepo,
+            IMapper mapper,
+            IElasticClient es,
+            IElasticSettings esSettings)
         {
             _createdRepo = createdRepo;
             _changedRepo = changedRepo;
             _mapper = mapper;
+            _es = es;
+            _esSettings = esSettings;
         }
 
         public async Task<Guid> CreateAsync(GameCreateDto dto, CancellationToken ct = default)
@@ -29,6 +39,21 @@ namespace FiapGamesService.Application.Services
             });
 
             await _createdRepo.AddAsync(created);
+
+            var current = await GetByIdAsync(created.Id, ct);
+            if (current != null)
+            {
+                await _es.IndexAsync(new GameSearchDocument
+                {
+                    Id = current.Id,
+                    Name = current.Name,
+                    Description = current.Description,
+                    Genre = current.Genre,
+                    Price = current.Price,
+                    CreatedAt = current.CreatedAt
+                }, ct);
+            }
+
             return created.Id;
         }
 
@@ -50,6 +75,20 @@ namespace FiapGamesService.Application.Services
             });
 
             await _changedRepo.AddAsync(changed);
+
+            var final = await GetByIdAsync(gameId, ct);
+            if (final != null)
+            {
+                await _es.IndexAsync(new GameSearchDocument
+                {
+                    Id = final.Id,
+                    Name = final.Name,
+                    Description = final.Description,
+                    Genre = final.Genre,
+                    Price = final.Price,
+                    CreatedAt = final.CreatedAt
+                }, ct);
+            }
         }
 
         public async Task DeleteAsync(Guid gameId, CancellationToken ct = default)
@@ -63,6 +102,8 @@ namespace FiapGamesService.Application.Services
                 ChangeType = GameChangeType.Deleted,
                 ChangedAt = DateTime.UtcNow
             });
+
+            await _es.DeleteAsync(gameId, ct);
         }
 
         public async Task<GameDto?> GetByIdAsync(Guid gameId, CancellationToken ct = default)
@@ -87,7 +128,8 @@ namespace FiapGamesService.Application.Services
 
             var createdList = await _createdRepo.GetListByConditionAsync(c =>
                 (string.IsNullOrEmpty(search) ||
-                    (c.Name.Contains(search) || (c.Description != null && c.Description.Contains(search)))) &&
+                    (c.Name.Contains(search) ||
+                    (c.Description != null && c.Description.Contains(search)))) &&
                 (string.IsNullOrEmpty(genre) || c.Genre == genre));
 
             var createdArr = createdList.ToArray();
@@ -110,18 +152,41 @@ namespace FiapGamesService.Application.Services
                 states.Add(new GameState { Created = c, LastChange = last });
             }
 
-            var dtos = _mapper.Map<List<GameDto>>(states);
-
-            dtos = dtos.OrderByDescending(x => x.CreatedAt).ThenBy(x => x.Name).ToList();
+            var dtos = _mapper.Map<List<GameDto>>(states)
+                              .OrderByDescending(x => x.CreatedAt)
+                              .ThenBy(x => x.Name)
+                              .ToList();
 
             var total = dtos.Count;
             var data = dtos.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
-            return new PaginationResult<GameDto>(page,
+            return new PaginationResult<GameDto>(
+                page,
                 (int)Math.Ceiling((double)total / pageSize),
                 pageSize,
                 total,
                 data);
         }
+
+        public async Task<PaginationResult<GameDto>> SearchEsAsync(
+            string? q, string? genre, int page = 1, int pageSize = 20, CancellationToken ct = default)
+        {
+            page = page <= 0 ? 1 : page;
+            pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
+
+            var (docs, total) = await _es.SearchAsync(q, genre, page, pageSize, ct);
+            var items = docs.Select(d => new GameDto(d.Id, d.Name, d.Description, d.Price, d.Genre, d.CreatedAt)).ToList();
+
+            return new PaginationResult<GameDto>(
+                page,
+                (int)Math.Ceiling((double)total / pageSize),
+                pageSize,
+                (int)total,
+                items
+            );
+        }
+
+        public Task<Dictionary<string, long>> TopGenresAsync(int size = 10, CancellationToken ct = default)
+            => _es.TopGenresAsync(Math.Min(size, 50), ct);
     }
 }

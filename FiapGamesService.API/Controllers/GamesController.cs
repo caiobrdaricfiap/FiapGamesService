@@ -32,7 +32,7 @@ namespace FiapGamesService.Controllers
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<GameDto>> GetById(Guid id, CancellationToken ct = default)
         {
-            var dto = await _service.GetByIdAsync(id, ct);   // <- nome correto
+            var dto = await _service.GetByIdAsync(id, ct);
             return dto is null ? NotFound() : Ok(dto);
         }
 
@@ -67,6 +67,27 @@ namespace FiapGamesService.Controllers
         {
             await _service.DeleteAsync(id, ct);
             return NoContent();
+        }
+
+        [HttpGet("search-es")]
+        public async Task<ActionResult<PaginationResult<GameDto>>> SearchEs(
+            [FromQuery] string? q,
+            [FromQuery] string? genre,
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20,
+            CancellationToken ct = default)
+        {
+            var res = await _service.SearchEsAsync(q, genre, page, pageSize, ct);
+            return Ok(res);
+        }
+
+        [HttpGet("metrics/top-genres")]
+        public async Task<ActionResult<Dictionary<string, long>>> TopGenres(
+            [FromQuery] int size = 10,
+            CancellationToken ct = default)
+        {
+            var res = await _service.TopGenresAsync(size, ct);
+            return Ok(res);
         }
     }
 }
