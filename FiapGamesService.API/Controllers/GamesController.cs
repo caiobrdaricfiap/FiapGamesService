@@ -16,18 +16,6 @@ namespace FiapGamesService.Controllers
             _service = service;
         }
 
-        // GET /fiap/games?search=&genre=&page=1&pageSize=20
-        [HttpGet]
-        [ProducesResponseType(typeof(PaginationResult<GameDto>), 200)]
-        public async Task<ActionResult<PaginationResult<GameDto>>> List([FromQuery] string? search, [FromQuery] string? genre, [FromQuery] int page = 1, [FromQuery] int pageSize = 20, CancellationToken ct = default)
-        {
-            page = page <= 0 ? 1 : page;
-            pageSize = pageSize <= 0 ? 20 : Math.Min(pageSize, 100);
-
-            var result = await _service.ListAsync(search, genre, page, pageSize, ct);
-            return Ok(result);
-        }
-
         // GET /fiap/games/{id}
         [HttpGet("{id:guid}")]
         public async Task<ActionResult<GameDto>> GetById(Guid id, CancellationToken ct = default)

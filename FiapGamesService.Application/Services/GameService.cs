@@ -15,20 +15,17 @@ namespace FiapGamesService.Application.Services
         private readonly IGameChangedEventRepository _changedRepo;
         private readonly IMapper _mapper;
         private readonly IElasticClient _es;
-        private readonly IElasticSettings _esSettings;
 
         public GameService(
             IGameCreatedEventRepository createdRepo,
             IGameChangedEventRepository changedRepo,
             IMapper mapper,
-            IElasticClient es,
-            IElasticSettings esSettings)
+            IElasticClient es)
         {
             _createdRepo = createdRepo;
             _changedRepo = changedRepo;
             _mapper = mapper;
             _es = es;
-            _esSettings = esSettings;
         }
 
         public async Task<Guid> CreateAsync(GameCreateDto dto, CancellationToken ct = default)
@@ -118,54 +115,6 @@ namespace FiapGamesService.Application.Services
             if (last?.ChangeType == GameChangeType.Deleted) return null;
 
             return _mapper.Map<GameDto>(new GameState { Created = created, LastChange = last });
-        }
-
-        public async Task<PaginationResult<GameDto>> ListAsync(
-            string? search, string? genre, int page = 1, int pageSize = 20, CancellationToken ct = default)
-        {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 20;
-
-            var createdList = await _createdRepo.GetListByConditionAsync(c =>
-                (string.IsNullOrEmpty(search) ||
-                    (c.Name.Contains(search) ||
-                    (c.Description != null && c.Description.Contains(search)))) &&
-                (string.IsNullOrEmpty(genre) || c.Genre == genre));
-
-            var createdArr = createdList.ToArray();
-            if (createdArr.Length == 0)
-                return new PaginationResult<GameDto>(page, 0, pageSize, 0, new List<GameDto>());
-
-            var ids = createdArr.Select(c => c.Id).ToHashSet();
-
-            var allChanges = await _changedRepo.GetListByConditionAsync(ch => ids.Contains(ch.GameId));
-            var lastByGame = allChanges
-                .GroupBy(ch => ch.GameId)
-                .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.ChangedAt).First());
-
-            var states = new List<GameState>(createdArr.Length);
-            foreach (var c in createdArr)
-            {
-                lastByGame.TryGetValue(c.Id, out var last);
-                if (last?.ChangeType == GameChangeType.Deleted) continue;
-
-                states.Add(new GameState { Created = c, LastChange = last });
-            }
-
-            var dtos = _mapper.Map<List<GameDto>>(states)
-                              .OrderByDescending(x => x.CreatedAt)
-                              .ThenBy(x => x.Name)
-                              .ToList();
-
-            var total = dtos.Count;
-            var data = dtos.Skip((page - 1) * pageSize).Take(pageSize).ToList();
-
-            return new PaginationResult<GameDto>(
-                page,
-                (int)Math.Ceiling((double)total / pageSize),
-                pageSize,
-                total,
-                data);
         }
 
         public async Task<PaginationResult<GameDto>> SearchEsAsync(

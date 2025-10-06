@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FiapGamesService.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20250930234152_InitGamesEvent")]
-    partial class InitGamesEvent
+    [Migration("20251006161811_GamesEventsTable")]
+    partial class GamesEventsTable
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

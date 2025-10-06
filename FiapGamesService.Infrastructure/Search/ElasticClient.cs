@@ -62,8 +62,8 @@ namespace FiapGamesService.Infrastructure.Search
 
             var sort = new List<SortOptions>
             {
-                new FieldSort { Field = "createdAt", Order = SortOrder.Desc },
-                new FieldSort { Field = "name",      Order = SortOrder.Asc  }
+                new FieldSort { Field = "createdAt",      Order = SortOrder.Desc },
+                new FieldSort { Field = "name.keyword",   Order = SortOrder.Asc }
             };
 
             var req = new SearchRequest<GameSearchDocument>(_index)
@@ -73,13 +73,17 @@ namespace FiapGamesService.Infrastructure.Search
                 Sort = sort,
                 Query = new BoolQuery
                 {
-                    Must = must,
-                    Filter = filter
+                    Must = must.Count > 0 ? must : null,
+                    Filter = filter.Count > 0 ? filter : null
                 }
             };
 
             var resp = await _es.SearchAsync<GameSearchDocument>(req, ct);
-            if (!resp.IsValidResponse) return (Array.Empty<GameSearchDocument>(), 0);
+
+            if (!resp.IsValidResponse)
+            {
+                return (Array.Empty<GameSearchDocument>(), 0);
+            }
 
             return (resp.Documents.ToList(), resp.Total);
         }
@@ -87,7 +91,7 @@ namespace FiapGamesService.Infrastructure.Search
         public async Task<Dictionary<string, long>> TopGenresAsync(int size = 10, CancellationToken ct = default)
         {
             var resp = await _es.SearchAsync<GameSearchDocument>(s => s
-                .Index(_index)
+                .Indices(_index)
                 .Size(0)
                 .Aggregations(a => a.Add("genres", new Aggregation
                 {

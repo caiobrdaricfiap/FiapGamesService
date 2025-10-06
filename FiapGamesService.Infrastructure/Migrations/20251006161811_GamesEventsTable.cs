@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FiapGamesService.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitGamesEvent : Migration
+    public partial class GamesEventsTable : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

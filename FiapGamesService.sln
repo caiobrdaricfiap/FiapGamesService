@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiapGamesService.Applicatio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiapGamesService.API", "FiapGamesService.API\FiapGamesService.API.csproj", "{8FD3EBE8-E60F-2D4D-FE78-3BE9823218E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FiapGamesService.UnitTests", "FiapGamesService.UnitTests\FiapGamesService.UnitTests.csproj", "{84465707-A076-4CC0-9CED-CB19F684E308}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{8FD3EBE8-E60F-2D4D-FE78-3BE9823218E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8FD3EBE8-E60F-2D4D-FE78-3BE9823218E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8FD3EBE8-E60F-2D4D-FE78-3BE9823218E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{84465707-A076-4CC0-9CED-CB19F684E308}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84465707-A076-4CC0-9CED-CB19F684E308}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84465707-A076-4CC0-9CED-CB19F684E308}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84465707-A076-4CC0-9CED-CB19F684E308}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
