@@ -26,6 +26,12 @@ builder.Services.AddSingleton<ElasticsearchClient>(sp =>
 
 builder.Services.AddSingleton<IElasticClient, ElasticClient>();
 
+builder.Services.AddHttpClient("payment-function", (sp, c) =>
+{
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    c.BaseAddress = new Uri(cfg["Functions:PaymentBaseUrl"]!);
+});
+
 builder.Services.AddDependencyInjection();
 // Add services to the container.
 

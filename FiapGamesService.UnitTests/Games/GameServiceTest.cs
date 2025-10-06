@@ -3,6 +3,7 @@ using FiapGamesService.Application.Services;
 using FiapGamesService.Domain.Interfaces;
 using FiapGamesService.Infrastructure.Search;
 using FluentAssertions;
+using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace FiapGamesService.UnitTests.Games
@@ -26,17 +27,58 @@ namespace FiapGamesService.UnitTests.Games
             Mock<IElasticClient> esMock,
             Mock<IGameCreatedEventRepository>? createdRepoMock = null,
             Mock<IGameChangedEventRepository>? changedRepoMock = null,
-            Mock<IMapper>? mapperMock = null)
+            Mock<IMapper>? mapperMock = null,
+            Mock<IHttpClientFactory>? httpFactoryMock = null,
+            Mock<IConfiguration>? configurationMock = null)
         {
             createdRepoMock ??= new Mock<IGameCreatedEventRepository>(MockBehavior.Strict);
             changedRepoMock ??= new Mock<IGameChangedEventRepository>(MockBehavior.Strict);
             mapperMock ??= new Mock<IMapper>(MockBehavior.Loose);
 
+            IConfiguration configuration = configurationMock?.Object
+                ?? new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["Functions:PaymentKey"] = null,
+                        ["Functions:PaymentBaseUrl"] = "http://localhost/"
+                    })
+                    .Build();
+
+            if (httpFactoryMock is null)
+            {
+                httpFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
+
+                var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Loose);
+                var httpClient = new HttpClient(handlerMock.Object)
+                {
+                    BaseAddress = new Uri("http://localhost/")
+                };
+
+                httpFactoryMock
+                    .Setup(f => f.CreateClient("payment-function"))
+                    .Returns(httpClient);
+            }
+            else
+            {
+                if (!httpFactoryMock.Invocations.Any(i => i.Method.Name == nameof(IHttpClientFactory.CreateClient)))
+                {
+                    var httpClient = new HttpClient(new HttpClientHandler())
+                    {
+                        BaseAddress = new Uri("http://localhost/")
+                    };
+                    httpFactoryMock
+                        .Setup(f => f.CreateClient("payment-function"))
+                        .Returns(httpClient);
+                }
+            }
+
             return new GameService(
                 createdRepoMock.Object,
                 changedRepoMock.Object,
                 mapperMock.Object,
-                esMock.Object
+                esMock.Object,
+                httpFactoryMock.Object,
+                configuration
             );
         }
 

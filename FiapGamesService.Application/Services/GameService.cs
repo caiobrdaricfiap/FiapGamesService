@@ -6,6 +6,9 @@ using FiapGamesService.Domain.Enums;
 using FiapGamesService.Domain.Interfaces;
 using FiapGamesService.Domain.Models;
 using FiapGamesService.Infrastructure.Search;
+using System.Net.Http.Json;
+using Microsoft.Extensions.Configuration;
+using System.Net;
 
 namespace FiapGamesService.Application.Services
 {
@@ -16,16 +19,25 @@ namespace FiapGamesService.Application.Services
         private readonly IMapper _mapper;
         private readonly IElasticClient _es;
 
+        private readonly HttpClient _paymentFnClient;
+        private readonly string? _functionKey;
+        private const string FunctionPath = "api/ProcessPayment";
+
         public GameService(
             IGameCreatedEventRepository createdRepo,
             IGameChangedEventRepository changedRepo,
             IMapper mapper,
-            IElasticClient es)
+            IElasticClient es, 
+            IHttpClientFactory httpFactory,
+            IConfiguration configuration)
         {
             _createdRepo = createdRepo;
             _changedRepo = changedRepo;
             _mapper = mapper;
             _es = es;
+
+            _paymentFnClient = httpFactory.CreateClient("payment-function");
+            _functionKey = configuration["Functions:PaymentKey"];
         }
 
         public async Task<Guid> CreateAsync(GameCreateDto dto, CancellationToken ct = default)
@@ -137,5 +149,38 @@ namespace FiapGamesService.Application.Services
 
         public Task<Dictionary<string, long>> TopGenresAsync(int size = 10, CancellationToken ct = default)
             => _es.TopGenresAsync(Math.Min(size, 50), ct);
+
+        public async Task<(bool ok, string body, int status)> PurchaseAsync(Guid gameId, PurchaseRequest req, CancellationToken ct = default)
+        {
+            var game = await GetByIdAsync(gameId, ct);
+            if (game is null)
+                return (false, "Jogo não encontrado.", (int)HttpStatusCode.NotFound);
+
+            var url = string.IsNullOrWhiteSpace(_functionKey)
+                ? FunctionPath
+                : $"{FunctionPath}?code={_functionKey}";
+
+            var payload = new
+            {
+                userId = req.UserId,
+                gameId = gameId.ToString(),
+                amount = game.Price,
+                currency = req.Currency
+            };
+
+            var resp = await _paymentFnClient.PostAsJsonAsync(url, payload, ct);
+            var body = await resp.Content.ReadAsStringAsync(ct);
+            return ((bool)resp.IsSuccessStatusCode, body, (int)resp.StatusCode);
+        }
+
+        public async Task<List<GameDto>> RecommendAsync(int take = 10, CancellationToken ct = default)
+        {
+            var top = await TopGenresAsync(size: 3, ct);
+            if (top == null || top.Count == 0) return new();
+
+            var primaryGenre = top.OrderByDescending(kv => kv.Value).First().Key;
+            var page = await SearchEsAsync(q: null, genre: primaryGenre, page: 1, pageSize: take, ct);
+            return page.Data;
+        }
     }
 }

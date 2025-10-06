@@ -77,5 +77,20 @@ namespace FiapGamesService.Controllers
             var res = await _service.TopGenresAsync(size, ct);
             return Ok(res);
         }
+
+        [HttpPost("{id:guid}/compra")]
+        public async Task<IActionResult> Comprar(Guid id, [FromBody] PurchaseRequest req, CancellationToken ct)
+        {
+            var (ok, body, status) = await _service.PurchaseAsync(id, req, ct);
+            if (!ok) return StatusCode(status, body);
+            return Accepted(new { status = "processing", detail = body });
+        }
+
+        [HttpGet("recommendations")]
+        public async Task<ActionResult<List<GameDto>>> Recommend([FromQuery] int take = 10, CancellationToken ct = default)
+        {
+            var data = await _service.RecommendAsync(take, ct);
+            return Ok(data);
+        }
     }
 }
