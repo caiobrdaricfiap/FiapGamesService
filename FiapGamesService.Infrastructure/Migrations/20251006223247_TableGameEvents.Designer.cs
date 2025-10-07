@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FiapGamesService.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20251006161811_GamesEventsTable")]
-    partial class GamesEventsTable
+    [Migration("20251006223247_TableGameEvents")]
+    partial class TableGameEvents
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,9 +27,11 @@ namespace FiapGamesService.Infrastructure.Migrations
 
             modelBuilder.Entity("FiapGamesService.Domain.Entities.GameChangedEvent", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("ChangeType")
                         .HasColumnType("int");
@@ -37,8 +39,8 @@ namespace FiapGamesService.Infrastructure.Migrations
                     b.Property<DateTime>("ChangedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<Guid>("GameId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<int>("GameId")
+                        .HasColumnType("int");
 
                     b.Property<string>("NewDescription")
                         .HasMaxLength(250)
@@ -85,9 +87,11 @@ namespace FiapGamesService.Infrastructure.Migrations
 
             modelBuilder.Entity("FiapGamesService.Domain.Entities.GameCreatedEvent", b =>
                 {
-                    b.Property<Guid>("Id")
+                    b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");

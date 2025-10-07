@@ -4,7 +4,7 @@ namespace FiapGamesService.Domain.Entities
 {
     public class GameChangedEvent : BaseEntity
     {
-        public Guid GameId { get; set; }
+        public int GameId { get; set; }
 
         public GameChangeType ChangeType { get; set; }
         public string? OldName { get; set; }

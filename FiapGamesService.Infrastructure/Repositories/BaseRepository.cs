@@ -27,7 +27,7 @@ namespace FiapGamesService.Infrastructure.Repositories
         public async Task<T?> GetFirstOrDefaultByConditionAsync(Expression<Func<T, bool>> predicate) =>
             await _db.AsNoTracking().Where(predicate).FirstOrDefaultAsync();
 
-        public async Task<T?> GetAsync(Guid id) =>
+        public async Task<T?> GetAsync(int id) =>
             await _db.FindAsync(id);
 
         public async Task<T> AddAsync(T entity)
@@ -48,7 +48,7 @@ namespace FiapGamesService.Infrastructure.Repositories
             return entity;
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(int id)
         {
             var current = await _db.FindAsync(id);
             if (current is null)

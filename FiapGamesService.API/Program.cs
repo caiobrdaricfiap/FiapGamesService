@@ -1,6 +1,7 @@
 using Elastic.Clients.Elasticsearch;
 using Elastic.Transport;
 using FiapGamesService.API.IoC;
+using FiapGamesService.Application.Payments;
 using FiapGamesService.Infrastructure;
 using FiapGamesService.Infrastructure.Search;
 using Microsoft.EntityFrameworkCore;
@@ -24,13 +25,13 @@ builder.Services.AddSingleton<ElasticsearchClient>(sp =>
     return new ElasticsearchClient(settings);
 });
 
-builder.Services.AddSingleton<IElasticClient, ElasticClient>();
-
-builder.Services.AddHttpClient("payment-function", (sp, c) =>
+builder.Services.AddHttpClient<IPaymentsClient, PaymentsClient>(c =>
 {
-    var cfg = sp.GetRequiredService<IConfiguration>();
-    c.BaseAddress = new Uri(cfg["Functions:PaymentBaseUrl"]!);
+    c.BaseAddress = new Uri(builder.Configuration["Services:Payments:BaseUrl"]!);
+    // Ex.: https://payments.fiap.com/  (SEM /api)
 });
+
+builder.Services.AddSingleton<IElasticClient, ElasticClient>();
 
 builder.Services.AddDependencyInjection();
 // Add services to the container.

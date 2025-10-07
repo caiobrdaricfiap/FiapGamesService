@@ -9,6 +9,7 @@ using FiapGamesService.Infrastructure.Search;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Configuration;
 using System.Net;
+using FiapGamesService.Application.Payments;
 
 namespace FiapGamesService.Application.Services
 {
@@ -16,36 +17,27 @@ namespace FiapGamesService.Application.Services
     {
         private readonly IGameCreatedEventRepository _createdRepo;
         private readonly IGameChangedEventRepository _changedRepo;
+        private readonly IPaymentsClient _paymentsClient;
         private readonly IMapper _mapper;
         private readonly IElasticClient _es;
-
-        private readonly HttpClient _paymentFnClient;
-        private readonly string? _functionKey;
-        private const string FunctionPath = "api/ProcessPayment";
 
         public GameService(
             IGameCreatedEventRepository createdRepo,
             IGameChangedEventRepository changedRepo,
+            IPaymentsClient paymentsClient,
             IMapper mapper,
-            IElasticClient es, 
-            IHttpClientFactory httpFactory,
-            IConfiguration configuration)
+            IElasticClient es)
         {
             _createdRepo = createdRepo;
             _changedRepo = changedRepo;
+            _paymentsClient = paymentsClient;
             _mapper = mapper;
             _es = es;
-
-            _paymentFnClient = httpFactory.CreateClient("payment-function");
-            _functionKey = configuration["Functions:PaymentKey"];
         }
 
-        public async Task<Guid> CreateAsync(GameCreateDto dto, CancellationToken ct = default)
+        public async Task<int> CreateAsync(GameCreateDto dto, CancellationToken ct = default)
         {
-            var created = _mapper.Map<GameCreatedEvent>(dto, opts =>
-            {
-                opts.Items["GameId"] = Guid.NewGuid();
-            });
+            var created = _mapper.Map<GameCreatedEvent>(dto);
 
             await _createdRepo.AddAsync(created);
 
@@ -66,7 +58,7 @@ namespace FiapGamesService.Application.Services
             return created.Id;
         }
 
-        public async Task UpdateAsync(Guid gameId, GameUpdateDto dto, CancellationToken ct = default)
+        public async Task UpdateAsync(int gameId, GameUpdateDto dto, CancellationToken ct = default)
         {
             var created = await _createdRepo.GetFirstOrDefaultByConditionAsync(c => c.Id == gameId);
             if (created is null) throw new KeyNotFoundException("Game not found");
@@ -100,7 +92,7 @@ namespace FiapGamesService.Application.Services
             }
         }
 
-        public async Task DeleteAsync(Guid gameId, CancellationToken ct = default)
+        public async Task DeleteAsync(int gameId, CancellationToken ct = default)
         {
             var created = await _createdRepo.GetFirstOrDefaultByConditionAsync(c => c.Id == gameId);
             if (created is null) return;
@@ -115,7 +107,7 @@ namespace FiapGamesService.Application.Services
             await _es.DeleteAsync(gameId, ct);
         }
 
-        public async Task<GameDto?> GetByIdAsync(Guid gameId, CancellationToken ct = default)
+        public async Task<GameDto?> GetByIdAsync(int gameId, CancellationToken ct = default)
         {
             var created = await _createdRepo.GetFirstOrDefaultByConditionAsync(c => c.Id == gameId);
             if (created is null) return null;
@@ -150,27 +142,109 @@ namespace FiapGamesService.Application.Services
         public Task<Dictionary<string, long>> TopGenresAsync(int size = 10, CancellationToken ct = default)
             => _es.TopGenresAsync(Math.Min(size, 50), ct);
 
-        public async Task<(bool ok, string body, int status)> PurchaseAsync(Guid gameId, PurchaseRequest req, CancellationToken ct = default)
+        public async Task<(bool ok, object body, int status)> PurchaseAsync(int gameId, PurchaseRequest req, CancellationToken ct = default)
         {
             var game = await GetByIdAsync(gameId, ct);
             if (game is null)
-                return (false, "Jogo não encontrado.", (int)HttpStatusCode.NotFound);
+                return (false, new { error = "Jogo não encontrado." }, (int)HttpStatusCode.NotFound);
 
-            var url = string.IsNullOrWhiteSpace(_functionKey)
-                ? FunctionPath
-                : $"{FunctionPath}?code={_functionKey}";
+            const int BRL_ENUM_VALUE = 0;
 
-            var payload = new
+            var payReq = new PaymentProcessInputForPayments
             {
-                userId = req.UserId,
-                gameId = gameId.ToString(),
-                amount = game.Price,
-                currency = req.Currency
+                UserId = req.UserId,
+                GameId = gameId,
+                Amount = game.Price,
+                Currency = BRL_ENUM_VALUE
             };
 
-            var resp = await _paymentFnClient.PostAsJsonAsync(url, payload, ct);
-            var body = await resp.Content.ReadAsStringAsync(ct);
-            return ((bool)resp.IsSuccessStatusCode, body, (int)resp.StatusCode);
+            var started = await _paymentsClient.ProcessAsync(payReq, ct);
+
+            if (!started.Success)
+            {
+                var msg = started.Message ?? "Falha ao iniciar processamento de pagamento.";
+                var isConflict = msg.Contains("Já existe um pagamento", StringComparison.OrdinalIgnoreCase);
+                return (false, new { error = msg }, isConflict ? (int)HttpStatusCode.Conflict : (int)HttpStatusCode.BadRequest);
+            }
+
+            var paymentId = started.Data?.ToString();
+            if (string.IsNullOrWhiteSpace(paymentId))
+                return (false, new { error = "Payments não retornou o ID da transação." }, (int)HttpStatusCode.BadGateway);
+
+            var (okDetail, detail, detailMsg) = await _paymentsClient.GetByIdAsync(paymentId, ct);
+
+            if (!okDetail || detail is null)
+            {
+                var fallback = new PurchaseUserResponse(
+                    Status: "Processing",
+                    Message: started.Message ?? "Processo iniciado.",
+                    PaymentId: paymentId,
+                    CreatedAt: null,
+                    UpdatedAt: null,
+                    Game: new { game.Id, game.Name, game.Price }
+                );
+                return (true, fallback, (int)HttpStatusCode.Accepted);
+            }
+
+            var statusText = string.IsNullOrWhiteSpace(detail.Status) ? "Processing" : detail.Status;
+            var message = !string.IsNullOrWhiteSpace(detail.Observation)
+                ? detail.Observation!
+                : (started.Message ?? "Processo finalizado.");
+
+            var http = statusText.Equals("Processed", StringComparison.OrdinalIgnoreCase)
+                ? (int)HttpStatusCode.OK
+                : statusText.Equals("Failed", StringComparison.OrdinalIgnoreCase)
+                    ? (int)HttpStatusCode.BadRequest
+                    : (int)HttpStatusCode.Accepted;
+
+            var response = new PurchaseUserResponse(
+                Status: statusText,
+                Message: message,
+                PaymentId: paymentId,
+                CreatedAt: detail.CreatedAt,
+                UpdatedAt: detail.UpdatedAt,
+                Game: new { game.Id, game.Name, game.Price }
+            );
+
+            return (true, response, http);
+        }
+
+        public async Task<(bool ok, object body, int status)> GetUserGamesAsync(int userId, bool includePending = false, CancellationToken ct = default)
+        {
+            var (ok, payments, msg) = await _paymentsClient.GetAllByUserAsync(userId, ct);
+            if (!ok || payments is null)
+                return (false, new { error = msg ?? "Não foi possível consultar os pagamentos do usuário." }, 502);
+
+            var valid = includePending
+                ? new[] { "Processed", "Processing" }
+                : new[] { "Processed" };
+
+            var latestByGame = payments
+                .Where(p => !string.IsNullOrWhiteSpace(p.Status) && valid.Contains(p.Status!, StringComparer.OrdinalIgnoreCase))
+                .GroupBy(p => p.GameId)
+                .Select(g => g.OrderByDescending(x => x.UpdatedAt).First())
+                .ToList();
+
+            if (latestByGame.Count == 0)
+                return (true, Array.Empty<UserGameDto>(), 200);
+
+            var result = new List<UserGameDto>();
+            foreach (var p in latestByGame)
+            {
+                var game = await GetByIdAsync(p.GameId, ct);
+                if (game is not null)
+                {
+                    result.Add(new UserGameDto(
+                        Id: game.Id,
+                        Name: game.Name,
+                        Price: game.Price,
+                        Status: p.Status ?? "Processed",
+                        PurchasedAtUtc: p.UpdatedAt
+                    ));
+                }
+            }
+
+            return (true, result, 200);
         }
 
         public async Task<List<GameDto>> RecommendAsync(int take = 10, CancellationToken ct = default)

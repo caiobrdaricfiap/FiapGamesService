@@ -8,7 +8,7 @@ namespace FiapGamesService.Application.DTOs
 {
     public class GameDto
     {
-        public Guid Id { get; set; }
+        public int Id { get; set; }
         public string Name { get; set; } = default!;
         public string? Description { get; set; }
         public decimal Price { get; set; }
@@ -17,7 +17,7 @@ namespace FiapGamesService.Application.DTOs
 
         public GameDto() { }
 
-        public GameDto(Guid id, string name, string? description, decimal price, string genre, DateTime createdAt)
+        public GameDto(int id, string name, string? description, decimal price, string genre, DateTime createdAt)
         {
             Id = id;
             Name = name;

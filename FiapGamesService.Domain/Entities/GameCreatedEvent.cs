@@ -8,9 +8,9 @@
         public string Genre { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        private GameCreatedEvent() { }
+        public GameCreatedEvent() { }
 
-        private GameCreatedEvent(string name, string? description, decimal price, string genre)
+        public GameCreatedEvent(string name, string? description, decimal price, string genre)
         {
             Update(name, description, price, genre);
             CreatedAt = DateTime.UtcNow;

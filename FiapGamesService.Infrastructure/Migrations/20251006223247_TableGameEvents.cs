@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace FiapGamesService.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class GamesEventsTable : Migration
+    public partial class TableGameEvents : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,7 +15,8 @@ namespace FiapGamesService.Infrastructure.Migrations
                 name: "GameCreatedEvent",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
                     Name = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     Description = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: true),
                     Price = table.Column<decimal>(type: "decimal(10,2)", precision: 10, scale: 2, nullable: false),
@@ -31,8 +32,9 @@ namespace FiapGamesService.Infrastructure.Migrations
                 name: "GameChangedEvent",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
-                    GameId = table.Column<Guid>(type: "uniqueidentifier", nullable: false),
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    GameId = table.Column<int>(type: "int", nullable: false),
                     ChangeType = table.Column<int>(type: "int", nullable: false),
                     OldName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
                     NewName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),

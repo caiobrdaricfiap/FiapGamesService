@@ -17,8 +17,8 @@ namespace FiapGamesService.Controllers
         }
 
         // GET /fiap/games/{id}
-        [HttpGet("{id:guid}")]
-        public async Task<ActionResult<GameDto>> GetById(Guid id, CancellationToken ct = default)
+        [HttpGet("{id:int}")]
+        public async Task<ActionResult<GameDto>> GetById(int id, CancellationToken ct = default)
         {
             var dto = await _service.GetByIdAsync(id, ct);
             return dto is null ? NotFound() : Ok(dto);
@@ -34,8 +34,8 @@ namespace FiapGamesService.Controllers
         }
 
         // PUT /fiap/games/{id}
-        [HttpPut("{id:guid}")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] GameUpdateDto dto, CancellationToken ct = default)
+        [HttpPut("{id:int}")]
+        public async Task<IActionResult> Update(int id, [FromBody] GameUpdateDto dto, CancellationToken ct = default)
         {
             if (!ModelState.IsValid) return ValidationProblem(ModelState);
             try
@@ -50,8 +50,8 @@ namespace FiapGamesService.Controllers
         }
 
         // DELETE /fiap/games/{id}
-        [HttpDelete("{id:guid}")]
-        public async Task<IActionResult> Delete(Guid id, CancellationToken ct = default)
+        [HttpDelete("{id:int}")]
+        public async Task<IActionResult> Delete(int id, CancellationToken ct = default)
         {
             await _service.DeleteAsync(id, ct);
             return NoContent();
@@ -78,12 +78,18 @@ namespace FiapGamesService.Controllers
             return Ok(res);
         }
 
-        [HttpPost("{id:guid}/compra")]
-        public async Task<IActionResult> Comprar(Guid id, [FromBody] PurchaseRequest req, CancellationToken ct)
+        [HttpPost("{id:int}/purchase")]
+        public async Task<IActionResult> PurchaseGame(int id, [FromBody] PurchaseRequest req, CancellationToken ct)
         {
             var (ok, body, status) = await _service.PurchaseAsync(id, req, ct);
-            if (!ok) return StatusCode(status, body);
-            return Accepted(new { status = "processing", detail = body });
+            return StatusCode(status, body);
+        }
+
+        [HttpGet("users/{userId:int}/games")]
+        public async Task<IActionResult> GetUserGames(int userId, [FromQuery] bool includePending = false, CancellationToken ct = default)
+        {
+            var (ok, body, status) = await _service.GetUserGamesAsync(userId, includePending, ct);
+            return StatusCode(status, body);
         }
 
         [HttpGet("recommendations")]

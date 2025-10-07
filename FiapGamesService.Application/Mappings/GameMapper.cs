@@ -15,12 +15,11 @@ namespace FiapGamesService.Application.Mappings
         public GameMapper()
         {
             CreateMap<GameCreateDto, GameCreatedEvent>()
-                .ForMember(d => d.Id, o => o.MapFrom((_, __, ___, ctx) =>
-                    ctx.Items.TryGetValue("GameId", out var v) && v is Guid id ? id : Guid.NewGuid()))
+                .ForMember(d => d.Id, o => o.Ignore())
                 .ForMember(d => d.CreatedAt, o => o.MapFrom(_ => DateTime.UtcNow));
 
             CreateMap<GameUpdateDto, GameChangedEvent>()
-                .ForMember(d => d.GameId, o => o.MapFrom((_, __, ___, ctx) => (Guid)ctx.Items["GameId"]))
+                .ForMember(d => d.GameId, o => o.MapFrom((_, __, ___, ctx) => (int)ctx.Items["GameId"]))
                 .ForMember(d => d.ChangedAt, o => o.MapFrom(_ => DateTime.UtcNow))
                 .ForMember(d => d.OldName, o => o.MapFrom((s, _, __, ctx) => ((GameDto)ctx.Items["Current"]).Name))
                 .ForMember(d => d.NewName, o => o.MapFrom(s => s.Name.Trim()))

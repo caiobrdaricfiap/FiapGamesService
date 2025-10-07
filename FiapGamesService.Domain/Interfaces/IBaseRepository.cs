@@ -12,10 +12,10 @@ namespace FiapGamesService.Domain.Interfaces
     {
         Task<IEnumerable<T>> GetListByConditionAsync(Expression<Func<T, bool>> predicate);
         Task<T?> GetFirstOrDefaultByConditionAsync(Expression<Func<T, bool>> predicate);
-        Task<T?> GetAsync(Guid id);
+        Task<T?> GetAsync(int id);
         Task<T> AddAsync(T entity);
         Task<T> UpdateAsync(T entity);
-        Task<bool> DeleteAsync(Guid id);
+        Task<bool> DeleteAsync(int id);
         Task SaveChangesAsync();
     }
 }

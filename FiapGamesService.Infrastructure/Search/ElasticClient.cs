@@ -7,7 +7,7 @@ namespace FiapGamesService.Infrastructure.Search
     public interface IElasticClient
     {
         Task IndexAsync(GameSearchDocument doc, CancellationToken ct = default);
-        Task DeleteAsync(Guid id, CancellationToken ct = default);
+        Task DeleteAsync(int id, CancellationToken ct = default);
         Task<(IReadOnlyList<GameSearchDocument> Docs, long Total)> SearchAsync(
             string? q, string? genre, int page, int size, CancellationToken ct = default);
         Task<Dictionary<string, long>> TopGenresAsync(int size = 10, CancellationToken ct = default);
@@ -29,7 +29,7 @@ namespace FiapGamesService.Infrastructure.Search
             await _es.IndexAsync(doc, i => i.Index(_index).Id(doc.Id), ct);
         }
 
-        public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+        public async Task DeleteAsync(int id, CancellationToken ct = default)
         {
             await _es.DeleteAsync<GameSearchDocument>(id.ToString(), d => d.Index(_index), ct);
         }

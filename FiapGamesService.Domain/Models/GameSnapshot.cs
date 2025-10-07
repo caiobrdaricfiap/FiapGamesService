@@ -8,7 +8,7 @@ namespace FiapGamesService.Domain.Models
 {
     public class GameSnapshot
     {
-        public Guid GameId { get; set; }
+        public int GameId { get; set; }
         public string Name { get; set; } = default!;
         public string? Description { get; set; }
         public decimal Price { get; set; }

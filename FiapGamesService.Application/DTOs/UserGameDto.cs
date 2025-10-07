@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 
 namespace FiapGamesService.Application.DTOs
 {
-    public record PaymentRequested(
-        int UserId,
-        string GameId,
-        decimal Amount,
-        string Currency
+    public record UserGameDto(
+        int Id, 
+        string Name, 
+        decimal Price,
+        string Status, 
+        DateTime? PurchasedAtUtc
     );
 }

@@ -1,21 +1,24 @@
 ﻿using AutoMapper;
+using FiapGamesService.Application.DTOs;
+using FiapGamesService.Application.Payments;
 using FiapGamesService.Application.Services;
 using FiapGamesService.Domain.Interfaces;
 using FiapGamesService.Infrastructure.Search;
 using FluentAssertions;
-using Microsoft.Extensions.Configuration;
 using Moq;
 
 namespace FiapGamesService.UnitTests.Games
 {
     public class GameServiceTest
     {
+        private static int _idSeed = 0;
+
         private static GameSearchDocument Doc(
-            Guid? id = null, string? name = null, string? desc = null,
+            int? id = null, string? name = null, string? desc = null,
             decimal? price = null, string? genre = null, DateTime? createdAt = null)
             => new GameSearchDocument
             {
-                Id = id ?? Guid.NewGuid(),
+                Id = id ?? Interlocked.Increment(ref _idSeed),
                 Name = name ?? "Game X",
                 Description = desc ?? "Desc",
                 Price = price ?? 99.90m,
@@ -27,58 +30,37 @@ namespace FiapGamesService.UnitTests.Games
             Mock<IElasticClient> esMock,
             Mock<IGameCreatedEventRepository>? createdRepoMock = null,
             Mock<IGameChangedEventRepository>? changedRepoMock = null,
-            Mock<IMapper>? mapperMock = null,
-            Mock<IHttpClientFactory>? httpFactoryMock = null,
-            Mock<IConfiguration>? configurationMock = null)
+            Mock<IPaymentsClient>? paymentsMock = null,
+            Mock<IMapper>? mapperMock = null)
         {
             createdRepoMock ??= new Mock<IGameCreatedEventRepository>(MockBehavior.Strict);
             changedRepoMock ??= new Mock<IGameChangedEventRepository>(MockBehavior.Strict);
+            paymentsMock ??= new Mock<IPaymentsClient>(MockBehavior.Strict);
             mapperMock ??= new Mock<IMapper>(MockBehavior.Loose);
 
-            IConfiguration configuration = configurationMock?.Object
-                ?? new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["Functions:PaymentKey"] = null,
-                        ["Functions:PaymentBaseUrl"] = "http://localhost/"
-                    })
-                    .Build();
-
-            if (httpFactoryMock is null)
-            {
-                httpFactoryMock = new Mock<IHttpClientFactory>(MockBehavior.Strict);
-
-                var handlerMock = new Mock<HttpMessageHandler>(MockBehavior.Loose);
-                var httpClient = new HttpClient(handlerMock.Object)
+            paymentsMock
+                .Setup(p => p.ProcessAsync(It.IsAny<PaymentProcessInputForPayments>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ApiResponseRaw { Success = true, Data = Guid.NewGuid().ToString(), Message = "OK" });
+            paymentsMock
+                .Setup(p => p.GetByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((true, new PaymentProcessOutputDto
                 {
-                    BaseAddress = new Uri("http://localhost/")
-                };
-
-                httpFactoryMock
-                    .Setup(f => f.CreateClient("payment-function"))
-                    .Returns(httpClient);
-            }
-            else
-            {
-                if (!httpFactoryMock.Invocations.Any(i => i.Method.Name == nameof(IHttpClientFactory.CreateClient)))
-                {
-                    var httpClient = new HttpClient(new HttpClientHandler())
-                    {
-                        BaseAddress = new Uri("http://localhost/")
-                    };
-                    httpFactoryMock
-                        .Setup(f => f.CreateClient("payment-function"))
-                        .Returns(httpClient);
-                }
-            }
+                    Id = Guid.NewGuid(),
+                    UserId = 1,
+                    GameId = 1,
+                    Amount = 99.9m,
+                    Status = "Processed",
+                    Currency = "BRL",
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }, "OK"));
 
             return new GameService(
                 createdRepoMock.Object,
                 changedRepoMock.Object,
+                paymentsMock.Object,
                 mapperMock.Object,
-                esMock.Object,
-                httpFactoryMock.Object,
-                configuration
+                esMock.Object
             );
         }
 
@@ -191,6 +173,70 @@ namespace FiapGamesService.UnitTests.Games
 
             r.Should().BeEquivalentTo(expected);
             es.Verify(x => x.TopGenresAsync(50, It.IsAny<CancellationToken>()), Times.Once);
+        }
+
+        [Fact(DisplayName = "GetUserGamesAsync - retorna apenas jogos com pagamento Processed (dedup por GameId)")]
+        public async Task GetUserGamesAsync_ReturnsProcessedOnly()
+        {
+            var payMock = new Mock<IPaymentsClient>(MockBehavior.Strict);
+
+            var payments = new List<PaymentProcessOutputDto>
+            {
+                new() { Id = Guid.NewGuid(), UserId = 10, GameId = 1, Status = "Processed", Amount = 99.9m, Currency = "BRL", CreatedAt = DateTime.UtcNow.AddMinutes(-5), UpdatedAt = DateTime.UtcNow.AddMinutes(-1) },
+                new() { Id = Guid.NewGuid(), UserId = 10, GameId = 2, Status = "Failed", Amount = 49.9m, Currency = "BRL", CreatedAt = DateTime.UtcNow.AddMinutes(-4), UpdatedAt = DateTime.UtcNow.AddMinutes(-2) },
+                new() { Id = Guid.NewGuid(), UserId = 10, GameId = 1, Status = "Processed", Amount = 99.9m, Currency = "BRL", CreatedAt = DateTime.UtcNow.AddMinutes(-10), UpdatedAt = DateTime.UtcNow.AddMinutes(-9) }
+            };
+
+            payMock.Setup(p => p.GetAllByUserAsync(10, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync((true, payments, "OK"));
+
+            var es = new Mock<IElasticClient>(MockBehavior.Loose);
+            var svc = new GameService(
+                Mock.Of<IGameCreatedEventRepository>(),
+                Mock.Of<IGameChangedEventRepository>(),
+                payMock.Object,
+                Mock.Of<IMapper>(),
+                es.Object);
+
+            var (ok, body, status) = await svc.GetUserGamesAsync(10, includePending: false, CancellationToken.None);
+
+            ok.Should().BeTrue();
+            status.Should().Be(200);
+
+            var list = body as IEnumerable<dynamic>;
+            list.Should().NotBeNull();
+            list!.Count().Should().BeGreaterThanOrEqualTo(0);
+
+            payMock.VerifyAll();
+        }
+
+        [Fact(DisplayName = "GetUserGamesAsync - includePending inclui Processing")]
+        public async Task GetUserGamesAsync_IncludePending()
+        {
+            var payMock = new Mock<IPaymentsClient>(MockBehavior.Strict);
+
+            var payments = new List<PaymentProcessOutputDto>
+            {
+                new() { Id = Guid.NewGuid(), UserId = 10, GameId = 1, Status = "Processed", UpdatedAt = DateTime.UtcNow },
+                new() { Id = Guid.NewGuid(), UserId = 10, GameId = 2, Status = "Processing", UpdatedAt = DateTime.UtcNow }
+            };
+
+            payMock.Setup(p => p.GetAllByUserAsync(10, It.IsAny<CancellationToken>()))
+                   .ReturnsAsync((true, payments, "OK"));
+
+            var svc = new GameService(
+                Mock.Of<IGameCreatedEventRepository>(),
+                Mock.Of<IGameChangedEventRepository>(),
+                payMock.Object,
+                Mock.Of<IMapper>(),
+                Mock.Of<IElasticClient>());
+
+            var (ok, body, status) = await svc.GetUserGamesAsync(10, includePending: true, CancellationToken.None);
+
+            ok.Should().BeTrue();
+            status.Should().Be(200);
+
+            payMock.VerifyAll();
         }
     }
 }
