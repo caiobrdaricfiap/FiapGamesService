@@ -37,4 +37,5 @@ Diagrama de sequencia
 # URL Miro
 https://miro.com/app/board/uXjVJJtlGm4=/?focusWidget=3458764640045890262
 
-![alt text](image.png)
+<img width="1540" height="589" alt="image" src="https://github.com/user-attachments/assets/d73bf340-a97f-42e5-bd20-630ac20dfd77" />
+
