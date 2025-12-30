@@ -1,0 +1,33 @@
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+USER $APP_UID
+WORKDIR /app
+EXPOSE 8080
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG BUILD_CONFIGURATION=Release
+WORKDIR /src
+
+# Copia apenas o csproj para cache
+COPY ["FiapGamesService.API/FiapGamesService.API.csproj", "FiapGamesService.API/"]
+
+WORKDIR /src/FiapGamesService.API
+RUN dotnet restore
+
+
+# Copia TODO o código agora
+COPY . /src
+
+RUN dotnet build "FiapGamesService.API.csproj" -c $BUILD_CONFIGURATION -o /app/build
+
+#publish stage
+FROM build AS publish
+ARG BUILD_CONFIGURATION=Release
+RUN dotnet publish "FiapGamesService.API.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+
+# Final stage
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "FiapGamesService.API.dll"]
